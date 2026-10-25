@@ -1,6 +1,9 @@
 // Reaction Trainer - Win32 / GDI front end. No third-party dependencies.
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <objbase.h>
+#include <oleauto.h>
 
 #include <cmath>
 #include <map>
@@ -159,6 +162,36 @@ static void toggleFullscreen() {
     }
 }
 
+// Text-to-speech through the built-in Windows voice (SAPI), late-bound so no extra SDK headers are needed.
+static IDispatch* gVoice = nullptr;
+
+static void initSpeech() {
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    CLSID clsid;
+    if (SUCCEEDED(CLSIDFromProgID(L"SAPI.SpVoice", &clsid)))
+        CoCreateInstance(clsid, nullptr, CLSCTX_ALL, IID_IDispatch, (void**)&gVoice);
+}
+
+static void speak(const std::string& text) {
+    if (!gVoice) return;
+    std::wstring w(text.begin(), text.end());
+    BSTR b = SysAllocString(w.c_str());
+    DISPID id;
+    OLECHAR* name = (OLECHAR*)L"Speak";
+    if (SUCCEEDED(gVoice->GetIDsOfNames(IID_NULL, &name, 1, LOCALE_USER_DEFAULT, &id))) {
+        VARIANT args[2];
+        VariantInit(&args[0]);
+        VariantInit(&args[1]);
+        args[1].vt = VT_BSTR;          // argument 1: the text (COM passes arguments in reverse order)
+        args[1].bstrVal = b;
+        args[0].vt = VT_I4;            // argument 2: flags = async (1) | purge pending speech (2)
+        args[0].lVal = 3;
+        DISPPARAMS dp = {args, nullptr, 2, 0};
+        gVoice->Invoke(id, IID_NULL, LOCALE_USER_DEFAULT, DISPATCH_METHOD, &dp, nullptr, nullptr, nullptr);
+    }
+    SysFreeString(b);
+}
+
 static DWORD WINAPI beepThread(LPVOID) {
     Beep(1000, 150);
     return 0;
@@ -241,9 +274,11 @@ int WINAPI WinMain(HINSTANCE inst, HINSTANCE, LPSTR, int show) {
     wc.lpszClassName = "ReactionTrainerWnd";
     RegisterClassA(&wc);
 
+    initSpeech();
     rt::Trainer app(nowMs);
     gApp = &app;
     app.onBeep = [] { HANDLE t = CreateThread(nullptr, 0, beepThread, nullptr, 0, nullptr); if (t) CloseHandle(t); };
+    app.onSpeak = [](const std::string& t) { speak(t); };
     app.onQuit = [] { DestroyWindow(gWnd); };
     app.onToggleFs = toggleFullscreen;
 

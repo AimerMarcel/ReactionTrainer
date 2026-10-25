@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(WIN32)
   add_executable(ReactionTrainer WIN32 src/main_win32.cpp)
-  target_link_libraries(ReactionTrainer PRIVATE user32 gdi32)
+  target_link_libraries(ReactionTrainer PRIVATE user32 gdi32 ole32 oleaut32 uuid)
   if(MSVC)
     # static runtime: the exe runs on any PC without the Visual C++ redistributable
     set_property(TARGET ReactionTrainer PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
