@@ -70,24 +70,33 @@ inline const Theme THEMES[5] = {{"GREEN", {0x3c, 0xff, 0x6e}, {0x03, 0x12, 0x08}
                                 {"B&W", {0xf2, 0xf2, 0xf2}, {0x00, 0x00, 0x00}},
                                 {"CUSTOM", {0xff, 0xff, 0xff}, {0x00, 0x00, 0x00}}};
 
-enum GameId { VRT, ART, SCH, TSW, STR };
+inline constexpr int NG = 7;  // number of tests
+enum GameId { VRT, ART, SCH, TSW, STR, DTP, BAL };
 struct GameInfo { const char* code; const char* name; const char* desc; };
-inline const GameInfo GAMES[5] = {
+inline const GameInfo GAMES[NG] = {
     {"VRT", "VISUAL REACTION", "Click the instant the screen flashes."},
     {"ART", "AUDIO REACTION", "Click the instant you hear the beep."},
     {"SCH", "SCHULTE TABLE", "Click the numbers in order, 1 up to the last, as fast as you can."},
     {"TSW", "TARGET SWITCH", "Click the lit dot. A new one lights up after each hit. A miss costs 500 ms."},
     {"STR", "COLOR TRIAL",
-     "A color word is printed in a different color. Press the button named after the color it is PRINTED in. "
-     "Example: GREEN printed in red means press Red. A draining timer runs on every word. A miss costs 500 ms."}};
+     "A color word is printed in another color. Press the button named after the PRINTED color "
+     "(GREEN printed in red = press Red). A draining timer runs on every word. A miss costs 500 ms."},
+    {"DTP", "DON'T TAP",
+     "Tap the black tile on the bottom row and the board moves up. Never tap a white tile. "
+     "Rounds are x5 tiles (25 / 50 / 100). A miss costs 500 ms."},
+    {"BAL", "BALL SHEET",
+     "Big balls appear on the sheet. Click each one as fast as you can. Rounds are x2 balls (10 / 20 / 40). "
+     "Clicking empty space costs 500 ms."}};
 inline const char* DIFFS[3] = {"EASY", "MEDIUM", "HARD"};
 inline const int ROUNDS[3] = {5, 10, 20};
-inline const char* DETAIL[5][3] = {
+inline const char* DETAIL[NG][3] = {
     {"Wait 1.5-3 s", "Wait 1.5-5 s", "Wait 0.8-6.5 s"},
     {"Wait 1.5-3 s", "Wait 1.5-5 s", "Wait 0.8-6.5 s"},
     {"Table spins at 20 deg/s", "Table spins at 32 deg/s", "Table spins at 48 deg/s"},
     {"2x3 grid (6 dots)", "3x3 grid (9 dots)", "4x4 grid (16 dots)"},
-    {"5 s per word, labels fixed", "3.5 s per word, label colors change", "2.5 s per word, colors change + buttons shuffle"}};
+    {"5 s per word, labels fixed", "3.5 s, label colors change", "2.5 s, colors + buttons shuffle"},
+    {"3 columns", "4 columns", "5 columns"},
+    {"1 big ball at a time", "2 balls at a time", "3 smaller balls at a time"}};
 struct ColorDef { const char* name; Color c; };
 inline const ColorDef COLORS[9] = {{"PINK", {0xff, 0x7a, 0xd9}},   {"RED", {0xff, 0x1f, 0x1f}},
                                    {"PURPLE", {0x9b, 0x30, 0xff}}, {"YELLOW", {0xff, 0xe1, 0x3a}},
@@ -103,14 +112,16 @@ inline const Color RANK_COL[12] = {{0x9a, 0x9a, 0x9a}, {0xcd, 0x7f, 0x32}, {0xc8
                                    {0xff, 0x5a, 0x5a}, {0xff, 0x9f, 0x43}, {0xff, 0x6b, 0xd6}, {0x7d, 0xf9, 0xff}};
 // A score below RANKT[game][i] earns rank 11-i (CELESTIAL first). Anything slower is IRON.
 // Units: ms. Schulte is ms per number. The visual reaction ladder (row 0) is the reference scale.
-inline const double RANKT[5][11] = {{170, 185, 200, 215, 230, 245, 260, 280, 305, 340, 400},
-                                    {140, 150, 160, 172, 185, 198, 212, 230, 255, 290, 350},
-                                    {300, 340, 380, 430, 490, 560, 640, 740, 860, 1050, 1400},
-                                    {260, 290, 320, 355, 395, 440, 490, 550, 620, 720, 900},
-                                    {600, 680, 760, 850, 950, 1070, 1200, 1370, 1600, 1950, 2600}};
+inline const double RANKT[NG][11] = {{100, 125, 140, 155, 170, 185, 205, 230, 260, 300, 360},   // VRT (reference ladder)
+                                     {90, 115, 130, 145, 160, 175, 195, 220, 250, 290, 350},    // ART
+                                     {300, 340, 380, 430, 490, 560, 640, 740, 860, 1050, 1400}, // SCH ms per number
+                                     {260, 290, 320, 355, 395, 440, 490, 550, 620, 720, 900},   // TSW
+                                     {600, 680, 760, 850, 950, 1070, 1200, 1370, 1600, 1950, 2600},  // STR
+                                     {160, 180, 200, 225, 250, 280, 315, 360, 420, 520, 700},   // DTP ms per tile
+                                     {350, 390, 430, 470, 520, 580, 650, 740, 860, 1030, 1300}};  // BAL ms per ball
 inline const double DIFF_FACTOR[3] = {1.0, 0.93, 0.86};  // harder difficulty counts a little better
 inline int rankFromScore(int game, double v) {
-    for (int i = 0; i < 11; i++) if (v < RANKT[game][i]) return 11 - i;
+    for (int i = 0; i < 11; i++) if (v <= RANKT[game][i]) return 11 - i;
     return 0;
 }
 inline std::string vkName(int k) {
@@ -125,7 +136,7 @@ inline std::string vkName(int k) {
 }
 
 inline int gameIndex(const std::string& code) {
-    for (int i = 0; i < 5; i++) if (code == GAMES[i].code) return i;
+    for (int i = 0; i < NG; i++) if (code == GAMES[i].code) return i;
     return 0;
 }
 inline std::string fmtv(int game, double ms) {
@@ -134,8 +145,8 @@ inline std::string fmtv(int game, double ms) {
 }
 inline const char* rating(int game, double v) {
     static const char* names[5] = {"EXCEPTIONAL", "EXCELLENT", "GOOD", "FAIR", "KEEP PRACTICING"};
-    static const double t[5][4] = {{200, 250, 300, 400}, {160, 200, 250, 350}, {450, 650, 900, 1300},
-                                   {300, 400, 550, 700}, {700, 900, 1150, 1500}};
+    static const double t[NG][4] = {{200, 250, 300, 400}, {160, 200, 250, 350}, {450, 650, 900, 1300}, {300, 400, 550, 700},
+                                    {700, 900, 1150, 1500}, {200, 260, 330, 420}, {420, 520, 650, 800}};
     for (int i = 0; i < 4; i++) if (v < t[game][i]) return names[i];
     return names[4];
 }
@@ -149,8 +160,8 @@ struct Run {
     std::vector<double> vals;
 };
 struct Settings {
-    int theme = 0, game = 0, rounds = 10, diff = 1, schSize = 5;
-    bool spinN = false, spinT = false, strAudio = true;
+    int theme = 0, game = 0, rounds = 10, diff = 1, schSize = 5, frenzy = 0;
+    bool spinN = false, spinT = false, strAudio = true, introSeen = false;
     double ih = 130, is = 0.8, iv = 1.0, bh = 130, bs = 0.9, bv = 0.07;  // custom theme (HSV)
     int kRestart = 0x20, kTab = 0x09, kTheme = 0x71, kFull = 0x79;       // rebindable keys
 };
@@ -186,7 +197,7 @@ struct Store {
             auto p = split(line, '\t');
             if (p[0] == "S" && p.size() >= 7) {
                 st.theme = std::clamp(std::atoi(p[1].c_str()), 0, 4);
-                st.game = std::clamp(std::atoi(p[2].c_str()), 0, 4);
+                st.game = std::clamp(std::atoi(p[2].c_str()), 0, NG - 1);
                 int r = std::atoi(p[3].c_str());
                 st.rounds = (r == 5 || r == 10 || r == 20) ? r : 10;
                 st.diff = std::clamp(std::atoi(p[4].c_str()), 0, 2);
@@ -201,6 +212,8 @@ struct Store {
                     st.kTab = std::clamp(std::atoi(p[16].c_str()), 1, 255);
                     st.kTheme = std::clamp(std::atoi(p[17].c_str()), 1, 255);
                     st.kFull = std::clamp(std::atoi(p[18].c_str()), 1, 255);
+                    st.introSeen = p.size() >= 20 && p[19] == "1";
+                    st.frenzy = p.size() >= 21 ? std::clamp(std::atoi(p[20].c_str()), 0, 2) : 0;
                 }
             } else if (p[0] == "R" && p.size() >= 13) {
                 Run r;
@@ -223,7 +236,7 @@ struct Store {
           << (st.spinN ? 1 : 0) << '\t' << (st.spinT ? 1 : 0) << '\t' << st.schSize << '\t' << (st.strAudio ? 1 : 0)
           << '\t' << F("%.1f", st.ih) << '\t' << F("%.3f", st.is) << '\t' << F("%.3f", st.iv) << '\t' << F("%.1f", st.bh)
           << '\t' << F("%.3f", st.bs) << '\t' << F("%.3f", st.bv) << '\t' << st.kRestart << '\t' << st.kTab << '\t'
-          << st.kTheme << '\t' << st.kFull << '\n';
+          << st.kTheme << '\t' << st.kFull << '\t' << (st.introSeen ? 1 : 0) << '\t' << st.frenzy << '\n';
         for (auto& r : runs) {
             f << "R\t" << r.t << '\t' << r.game << '\t' << r.diff << '\t' << r.rounds << '\t' << r.done << '\t'
               << (r.complete ? 1 : 0) << '\t' << F("%.1f", r.avg) << '\t' << F("%.1f", r.best) << '\t'
@@ -247,17 +260,19 @@ inline double runScore(const Run& r) { return normAvg(r) * DIFF_FACTOR[diffIndex
 using Fn = std::function<void()>;
 
 struct Trainer {
-    enum Screen { MENU, DATA, RANK, KEYS, THEME, PLAY, RESULT };  // first five are the nav-bar tabs
+    enum Screen { MENU, DATA, RANK, KEYS, THEME, PLAY, RESULT, INTRO };  // first five are the nav-bar tabs
     enum Phase { READY, WAIT, GO, SHOW, RUN, DONE };
     struct Region { double x1, y1, x2, y2; Fn cb; };
     struct PolyRegion { std::vector<Pt> pts; Fn cb; };
+    struct Ball { double fx = 0, fy = 0, t0 = 0; bool pending = true; };
     struct G {
         int game = 0, di = 0, rounds = 0, idx = 0, miss = 0;
         std::vector<double> vals;
         Phase phase = READY;
         double t0 = 0, spin0 = 0, pen = 0;
-        int n = 0, cur = 1, lit = -1, r = 0, c = 0, word = 0, ink = 0;
-        std::vector<int> nums, ang, order, lab;
+        int n = 0, cur = 1, lit = -1, r = 0, c = 0, word = 0, ink = 0, frenzy = 0;
+        std::vector<int> nums, ang, order, lab, tiles;
+        std::vector<Ball> balls;
         bool spinN = false, spinT = false, newbest = false, hasRec = false;
         Run rec;
     };
@@ -268,8 +283,8 @@ struct Trainer {
     std::function<void(const std::string&)> onSpeak;
 
     Store store;
-    int theme = 0, sel = 0, rounds = 10, diff = 1, schSize = 5;
-    bool spinN = false, spinT = false, strAudio = true;
+    int theme = 0, sel = 0, rounds = 10, diff = 1, schSize = 5, frenzy = 0;
+    bool spinN = false, spinT = false, strAudio = true, introSeen = false;
     double ih = 130, is = 0.8, iv = 1.0, bh = 130, bs = 0.9, bv = 0.07;
     int kRestart = 0x20, kTab = 0x09, kTheme = 0x71, kFull = 0x79;
     int rebind = -1, mx = 0, my = 0;
@@ -286,7 +301,9 @@ struct Trainer {
     std::mt19937 rng;
 
     struct Job { double due = 0; Fn fn; bool active = false; } job;
-    double badDue = 0, lastSpin = 0;
+    double badDue = 0, lastSpin = 0, fieldW = 700, fieldH = 400;
+    std::vector<Pt> ballPos;
+    double ballR = 0;
 
     Canvas* cv = nullptr;
     int W = 1100, H = 720, fs = 14, big = 30;
@@ -295,11 +312,13 @@ struct Trainer {
     explicit Trainer(std::function<double()> clk) : clock(std::move(clk)) {
         store.load();
         const Settings& z = store.st;
-        theme = z.theme; sel = z.game; rounds = z.rounds; diff = z.diff; schSize = z.schSize;
+        theme = z.theme; sel = z.game; rounds = z.rounds; diff = z.diff; schSize = z.schSize; frenzy = z.frenzy;
         spinN = z.spinN; spinT = z.spinT; strAudio = z.strAudio;
         ih = z.ih; is = z.is; iv = z.iv; bh = z.bh; bs = z.bs; bv = z.bv;
         kRestart = z.kRestart; kTab = z.kTab; kTheme = z.kTheme; kFull = z.kFull;
+        introSeen = z.introSeen;
         rng.seed((unsigned)std::time(nullptr) ^ (unsigned)(clock() * 1000.0));
+        if (!introSeen) startIntro();   // first launch: play the intro
     }
 
     // ---- helpers
@@ -316,7 +335,8 @@ struct Trainer {
         return screen == PLAY && g.phase == RUN && ((g.game == SCH && g.spinT) || g.game == STR);
     }
     std::string mods() const {
-        return sel == SCH ? F("%d", schSize) + (spinN ? "N" : "") + (spinT ? "T" : "") : std::string();
+        return sel == SCH ? F("%d", schSize) + (frenzy ? F("F%d", frenzy) : std::string()) + (spinN ? "N" : "") + (spinT ? "T" : "")
+                          : std::string();
     }
     double strLimit() const { static const double lim[3] = {5000, 3500, 2500}; return lim[g.di]; }
 
@@ -324,7 +344,7 @@ struct Trainer {
     double bestScore(int game) const {
         double b = -1;
         for (auto& r : store.runs) {
-            if (gameIndex(r.game) != game || !r.complete) continue;
+            if (gameIndex(r.game) != game || !r.complete || r.mods.find('F') != std::string::npos) continue;
             double v = runScore(r);
             if (b < 0 || v < b) b = v;
         }
@@ -333,7 +353,7 @@ struct Trainer {
     int gameRank(int game) const { double b = bestScore(game); return b < 0 ? -1 : rankFromScore(game, b); }
     bool overall(int& idx, double& frac) const {
         double sum = 0; int c = 0;
-        for (int i = 0; i < 5; i++) { int r = gameRank(i); if (r >= 0) { sum += r; c++; } }
+        for (int i = 0; i < NG; i++) { int r = gameRank(i); if (r >= 0) { sum += r; c++; } }
         if (!c) return false;
         double m = sum / c;
         idx = (int)std::floor(m + 1e-9); frac = m - idx;
@@ -342,7 +362,7 @@ struct Trainer {
     double bestNorm(int game, const std::string& dn) const {
         double b = -1;
         for (auto& r : store.runs)
-            if (gameIndex(r.game) == game && r.diff == dn && r.complete && (b < 0 || normAvg(r) < b)) b = normAvg(r);
+            if (gameIndex(r.game) == game && r.diff == dn && r.complete && r.mods.find('F') == std::string::npos && (b < 0 || normAvg(r) < b)) b = normAvg(r);
         return b;
     }
 
@@ -361,11 +381,15 @@ struct Trainer {
         if (job.active && n >= job.due) { Fn f = job.fn; job.active = false; f(); }
         if (badDue > 0 && n >= badDue) { badDue = 0; bad = -1; if (screen == PLAY) redraw(); }
         if (screen == PLAY && g.game == STR && g.phase == RUN && !awaitPaint && n - g.t0 >= strLimit()) strTimeout();
-        if (animating() && n - lastSpin >= 16) { lastSpin = n; dirty = true; }
+        if ((animating() || screen == INTRO) && n - lastSpin >= 16) { lastSpin = n; dirty = true; }
         return dirty;
     }
     void armT0() { awaitPaint = true; }
-    void presented() { if (awaitPaint) { g.t0 = clock(); awaitPaint = false; } }
+    void presented() {
+        if (awaitPaint) { g.t0 = clock(); awaitPaint = false; }
+        if (screen == PLAY && g.game == BAL)
+            for (auto& b : g.balls) if (b.pending) { b.t0 = clock(); b.pending = false; }
+    }
 
     // ---- drawing primitives
     void T(double x, double y, const std::string& s, int size = -1, Anchor a = NW, int fl = 0) {
@@ -400,6 +424,7 @@ struct Trainer {
         big = std::max(24, (int)(H / 10.0));
         regions.clear(); polys.clear();
         cv->clear(bg());
+        if (screen == INTRO) { drawIntro(); if (screen == INTRO) dirty = false; return; }
         frame();
         switch (screen) {
             case MENU: menu(); break;
@@ -409,6 +434,7 @@ struct Trainer {
             case THEME: drawTheme(); break;
             case PLAY: play(); break;
             case RESULT: result(); break;
+            case INTRO: break;  // handled above
         }
         dirty = false;
     }
@@ -416,7 +442,7 @@ struct Trainer {
     std::string hint() const {
         std::string tk = vkName(kTab), rk = vkName(kRestart);
         switch (screen) {
-            case MENU: return "1-5 GAME  R ROUNDS  D DIFF  N/S SPIN  A AUDIO  ENTER START  " + tk + " NEXT TAB  ESC QUIT";
+            case MENU: return "1-7 GAME  R ROUNDS  D DIFF  N/S SPIN  A AUDIO  ENTER START  " + tk + " NEXT TAB  ESC QUIT";
             case DATA: case RANK: return tk + " NEXT TAB   F2 COLOR   ESC BACK";
             case KEYS: return "CLICK A KEY ROW, THEN PRESS THE NEW KEY   ESC CANCEL / BACK";
             case THEME: return "CLICK THE WHEEL AND THE BAR TO MAKE YOUR OWN COLORS   ESC BACK";
@@ -487,7 +513,7 @@ struct Trainer {
     void menu() {
         int rh = (int)(fs * 2.5);
         double x1 = cx1, x2 = cx2, y = top, lw = (x2 - x1) * 0.44;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < NG; i++) {
             double t = y + i * (rh + 8);
             B(x1, t, x1 + lw, t + rh, F("%d  %s", i + 1, GAMES[i].name), [this, i] { select(i); }, i == sel, false, -1, true);
         }
@@ -497,7 +523,9 @@ struct Trainer {
         int lines = (int)std::ceil(std::strlen(gi.desc) * fs * 0.76 / std::max(1.0, pw));
         Tw(px, y + fs * 2.3, gi.desc, (int)pw, DIM);
         double yy = y + fs * 2.3 + lines * fs * 1.5 + fs * 0.8;
-        double rh2 = (int)(fs * 2.1), labw = fs * 0.76 * 11;
+        int nopt = 2 + (sel == SCH ? 3 : (sel == STR ? 1 : 0));          // option rows for this test
+        double startH = std::max(fs * 2.2, rh * 0.9);
+        double rh2 = std::clamp((bot - yy - startH - fs * 3.8) / nopt - 8, fs * 1.4, fs * 2.1), labw = fs * 0.76 * 11;
         auto row = [&](const char* label, int n, const std::function<std::string(int)>& nm,
                        const std::function<bool(int)>& on, const std::function<void(int)>& act) {
             T(px, yy + rh2 / 2, label, -1, Anchor::W, DIM);
@@ -519,16 +547,21 @@ struct Trainer {
         if (sel == SCH) {
             row("SIZE", 4, [](int i) { return F("%dx%d", i + 3, i + 3); }, [&](int i) { return i + 3 == schSize; },
                 [this](int i) { setSize(i + 3); });
+            row("FRENZY", 3, [](int i) { return i == 0 ? std::string("OFF") : (i == 1 ? std::string("1 REACT") : std::string("2")); },
+                [&](int i) { return i == frenzy; },
+                [this](int i) { setFrenzy(i); });
             toggles(std::string("SPIN NUMBERS: ") + (spinN ? "ON" : "OFF"), spinN, [this] { toggleN(); },
                     std::string("SPIN TABLE: ") + (spinT ? "ON" : "OFF"), spinT, [this] { toggleT(); });
         } else if (sel == STR) {
             toggles(std::string("WORD AUDIO: ") + (strAudio ? "ON" : "OFF"), strAudio, [this] { toggleAudio(); }, "", false, Fn());
         }
-        T(px, yy, DETAIL[sel][diff], -1, NW, DIM);
+        std::string detail = DETAIL[sel][diff];
+        if (sel == SCH && frenzy) detail = frenzy == 1 ? "Frenzy 1: one number at a time" : "Frenzy 2: two numbers shown";
+        T(px, yy, detail, -1, NW, DIM);
         yy += fs * 1.7;
         T(px, yy, "BEST AVG: " + fmtv(sel, bestAvg(GAMES[sel].code, DIFFS[diff], mods())));
-        double ys = std::max(yy + fs * 1.9, bot - rh * 1.15);
-        B(px, ys, x2, ys + rh * 1.15, "[ START ]", [this] { begin(); }, false, false, fs + 3);
+        double ys = bot - startH;
+        B(px, ys, x2, ys + startH, "[ START ]", [this] { begin(); }, false, false, fs + 3);
     }
 
     void drawData() {
@@ -536,7 +569,7 @@ struct Trainer {
         int lh = (int)(fs * 1.65);
         T(x, y, "PERSONAL BEST (AVG PER ROUND, SCHULTE PER NUMBER)   E=EASY M=MEDIUM H=HARD", -1, NW, DIM);
         y += lh;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < NG; i++) {
             std::string parts;
             for (int d = 0; d < 3; d++) parts += std::string(d ? "   " : "") + F("%c ", DIFFS[d][0]) + fmtv(i, bestNorm(i, DIFFS[d]));
             T(x, y, F("%-16s", GAMES[i].name) + parts);
@@ -565,6 +598,8 @@ struct Trainer {
         else if (g.phase != RUN) centerMsg();
         else if (g.game == SCH) pSch();
         else if (g.game == STR) pStr();
+        else if (g.game == DTP) pDtp();
+        else if (g.game == BAL) pBal();
         else pTsw();
     }
 
@@ -597,18 +632,23 @@ struct Trainer {
             int r = k / n, c = k % n, v = g.nums[k];
             double ox = (c + 0.5) * cell - side / 2, oy = (r + 0.5) * cell - side / 2;
             double cx = mx + ox * co - oy * si, cy = my + ox * si + oy * co, ang = g.ang[k] - thDeg;
-            if (v < g.cur) { Tx(cx, cy, F("%d", v), size, Anchor::C, mix(ink(), bg(), 0.5), ang); continue; }
+            if (v < g.cur) { if (!g.frenzy) Tx(cx, cy, F("%d", v), size, Anchor::C, mix(ink(), bg(), 0.5), ang); continue; }
             double h = cell / 2 - 3;
             std::vector<Pt> pts;
             const double d[4][2] = {{-h, -h}, {h, -h}, {h, h}, {-h, h}};
             for (auto& q : d) pts.push_back({cx + q[0] * co - q[1] * si, cy + q[0] * si + q[1] * co});
             bool isBad = bad == k;
             Color k1 = ink();
-            cv->poly(pts, k1, isBad ? &k1 : nullptr, 2);
-            Tx(cx, cy, F("%d", v), size, Anchor::C, isBad ? bg() : ink(), ang);
+            bool vis = schVisible(k);
+            Color cover = mix(ink(), bg(), 0.75);
+            cv->poly(pts, vis ? k1 : mix(ink(), bg(), 0.5), isBad ? &k1 : (vis ? nullptr : &cover), 2);
+            if (vis) Tx(cx, cy, F("%d", v), size, Anchor::C, isBad ? bg() : ink(), ang);
             polys.push_back({pts, [this, k] { schClick(k); }});
         }
     }
+
+    // frenzy: only the next g.frenzy numbers are revealed, the rest stay covered
+    bool schVisible(int k) const { return !g.frenzy || (g.nums[k] >= g.cur && g.nums[k] < g.cur + g.frenzy); }
 
     void pTsw() {
         int r = g.r, c = g.c;
@@ -693,7 +733,7 @@ struct Trainer {
         y += lh * 1.6;
         T(x1, y, "BY TEST (BEST SCORE)", -1, NW, DIM);
         y += lh;
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < NG; i++) {
             int r = gameRank(i);
             T(x1, y, GAMES[i].name);
             if (r >= 0) {
@@ -733,11 +773,11 @@ struct Trainer {
               [this, i] { rebind = i; keyMsg = "PRESS THE NEW KEY (ESC CANCELS)"; redraw(); }, rebind == i, false, fs - 1);
         }
         T(x1, y + 4 * (rh + 8) + 4, keyMsg, fs - 1, NW, DIM);
-        static const char* fl[9][2] = {{"START / REACT", "ENTER"}, {"BACK / ABORT / QUIT", "ESC"}, {"PICK TEST", "1-5"},
+        static const char* fl[10][2] = {{"START / REACT", "ENTER"}, {"BACK / ABORT / QUIT", "ESC"}, {"PICK TEST", "1-7"},
                                        {"ROUNDS", "R"}, {"DIFFICULTY", "D"}, {"SPIN NUMBERS", "N"},
-                                       {"SPIN TABLE", "S"}, {"WORD AUDIO", "A"}, {"CLICK TARGETS", "MOUSE"}};
+                                       {"SPIN TABLE", "S"}, {"WORD AUDIO", "A"}, {"REPLAY INTRO", "I"}, {"CLICK TARGETS", "MOUSE"}};
         double yy = y;
-        double step = std::min((double)(rh + 8), (bot - y) / 9.0);
+        double step = std::min((double)(rh + 8), (bot - y) / 10.0);
         for (auto& f : fl) {
             T(x1 + colw, yy, f[0], fs - 1, NW, DIM);
             T(x2, yy, f[1], fs - 1, NE);
@@ -842,13 +882,265 @@ struct Trainer {
         B(px + bw + 10, by, x2, by + rh, "[ MENU ]", [this] { back(); });
     }
 
+    // ---- Don't Tap: tap the black tile on the bottom row, never a white one
+    int randCol(int cols) { return rint(cols); }
+    void dtpStart() {
+        g.n = 3 + g.di;                      // columns
+        g.tiles.clear();
+        for (int i = 0; i < 4; i++) g.tiles.push_back(randCol(g.n));
+        g.pen = 0; g.phase = RUN;
+        redraw(); armT0();
+    }
+    void dtpClick(int col) {
+        if (!live()) return;
+        if (col == g.tiles[0]) {
+            g.vals.push_back(clock() - g.t0 + g.pen);
+            g.pen = 0; g.idx++;
+            g.tiles.erase(g.tiles.begin());
+            g.tiles.push_back(randCol(g.n));
+            if (g.idx >= g.rounds) return finish();
+            redraw(); armT0();
+        } else { g.pen += 500; missFlash(col); }
+    }
+    void pDtp() {
+        int cols = g.n, nrows = 4;
+        T(cx1, top, F("TILE %d/%d", g.idx + 1, g.rounds), fs + 4);
+        if (!g.vals.empty()) {
+            double s = 0;
+            for (double d : g.vals) s += d;
+            T(cx2, top + 4, F("AVG %.0f ms", s / g.vals.size()), -1, NE);
+        }
+        double ty = top + fs * 3, avail = bot - ty, th = avail / nrows;
+        double tw = std::min(th * 0.85, (cx2 - cx1) / cols), x0 = (cx1 + cx2) / 2 - tw * cols / 2;
+        Color k1 = ink(), dimc = mix(ink(), bg(), 0.6), flashc = mix(ink(), bg(), 0.5);
+        for (int r = 0; r < nrows; r++) {
+            double y1 = ty + avail - (r + 1) * th + 3, y2 = ty + avail - r * th - 3;
+            for (int c = 0; c < cols; c++) {
+                double xa = x0 + c * tw + 3, xb = x0 + (c + 1) * tw - 3;
+                bool black = g.tiles[r] == c;
+                if (black) cv->rect(xa, y1, xb, y2, k1, &k1, 2);
+                else if (r == 0 && bad == c) cv->rect(xa, y1, xb, y2, k1, &flashc, 2);
+                else cv->rect(xa, y1, xb, y2, r == 0 ? k1 : dimc, nullptr, r == 0 ? 2 : 1);
+            }
+        }
+        for (int c = 0; c < cols; c++)   // only the bottom row can be tapped (these are the LAST `cols` regions)
+            regions.push_back({x0 + c * tw, ty + avail - th, x0 + (c + 1) * tw, ty + avail, [this, c] { dtpClick(c); }});
+    }
+
+    // ---- Ball Sheet: big balls appear on the sheet, click each one fast
+    void balStart() {
+        g.balls.clear(); g.pen = 0; g.phase = RUN;
+        int at = g.di + 1;
+        for (int i = 0; i < at && g.idx + (int)g.balls.size() < g.rounds; i++) balSpawn();
+        redraw();
+    }
+    double balRadius() const { static const double k[3] = {0.13, 0.10, 0.07}; return std::min(fieldW, fieldH) * k[g.di]; }
+    void balSpawn() {
+        double R = balRadius();
+        Ball b;
+        for (int attempt = 0; attempt < 40; attempt++) {
+            b.fx = rnd(0, 1); b.fy = rnd(0, 1);
+            bool ok = true;
+            for (auto& o : g.balls) {
+                double dx = (b.fx - o.fx) * (fieldW - 2 * R), dy = (b.fy - o.fy) * (fieldH - 2 * R);
+                if (std::sqrt(dx * dx + dy * dy) < 2.3 * R) { ok = false; break; }
+            }
+            if (ok) break;
+        }
+        b.pending = true;
+        g.balls.push_back(b);
+    }
+    void balMiss() { g.miss++; g.pen += 500; redraw(); }
+    void balClick(int i) {
+        if (!live() || i >= (int)g.balls.size() || i >= (int)ballPos.size()) return;
+        Ball& b = g.balls[i];
+        if (b.pending) return;
+        double dx = mx - ballPos[i].x, dy = my - ballPos[i].y;
+        if (std::sqrt(dx * dx + dy * dy) > ballR) { balMiss(); return; }   // corner of the box, not the ball
+        g.vals.push_back(clock() - b.t0 + g.pen);
+        g.pen = 0; g.idx++;
+        g.balls.erase(g.balls.begin() + i);
+        if (g.idx + (int)g.balls.size() < g.rounds) balSpawn();
+        if (g.idx >= g.rounds) return finish();
+        redraw();
+    }
+    void pBal() {
+        T(cx1, top, F("BALL %d/%d", g.idx + 1, g.rounds), fs + 4);
+        if (!g.vals.empty()) {
+            double s = 0;
+            for (double d : g.vals) s += d;
+            T(cx2, top + 4, F("AVG %.0f ms", s / g.vals.size()), -1, NE);
+        }
+        double fy = top + fs * 3;
+        fieldW = cx2 - cx1; fieldH = bot - fy;
+        cv->rect(cx1, fy, cx2, bot, mix(ink(), bg(), 0.6), nullptr, 1);
+        double R = balRadius();
+        ballR = R;
+        ballPos.clear();
+        Color k1 = ink(), b2 = bg();
+        for (size_t i = 0; i < g.balls.size(); i++) {
+            double x = cx1 + R + g.balls[i].fx * (fieldW - 2 * R), y = fy + R + g.balls[i].fy * (fieldH - 2 * R);
+            ballPos.push_back({x, y});
+            cv->oval(x, y, R, k1, &k1, 3);
+            cv->oval(x, y, R * 0.55, b2, nullptr, 3);
+            regions.push_back({x - R, y - R, x + R, y + R, [this, i] { balClick((int)i); }});
+        }
+    }
+
+    // ---- intro: a glitching terminal that resolves into MARCEL VRT, drawn in the current theme colors
+    struct Intro {
+        int cols = 0, rows = 0, pt = 0;
+        double adv = 9, cellH = 18, x0 = 0;
+        std::vector<char> ch;
+        std::vector<float> rt, blur, bar;
+        std::vector<unsigned char> mask;
+    } intro;
+    double introT0 = 0;
+    static constexpr double INTRO_END = 6.8;
+
+    char junkChar() {
+        static const char set[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;:,.#%&*/-+=<>";
+        return set[rng() % (sizeof(set) - 1)];
+    }
+    char letterChar() { return (char)('A' + rng() % 26); }
+    void startIntro() { introT0 = clock(); screen = INTRO; intro.cols = 0; redraw(); }
+    void endIntro() { introSeen = true; screen = MENU; tab = 0; persist(); redraw(); }
+
+    void introBuild() {
+        Intro& I = intro;
+        int pt = std::max(7, (int)std::lround(W / 120.0 / 0.55 * 0.75));
+        double pxh = pt * 96.0 / 72.0, adv = pxh * 0.55, cellH = std::ceil(pxh * 1.12);
+        int cols = std::max(20, (int)((W - 24) / adv)), rows = std::max(10, (int)(H / cellH));
+        if (cols == I.cols && rows == I.rows && pt == I.pt) return;
+        I.cols = cols; I.rows = rows; I.pt = pt; I.adv = adv; I.cellH = cellH; I.x0 = (W - cols * adv) / 2;
+        size_t n = (size_t)cols * rows;
+        I.ch.resize(n); I.rt.assign(n, 0.f); I.blur.assign(n, 0.f); I.mask.assign(n, 0); I.bar.clear();
+        for (auto& c : I.ch) c = junkChar();
+
+        static const char* G[8][7] = {  // 5x7 pixel font for M A R C E L V T
+            {"#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#"}, {".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"},
+            {"####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"}, {".###.", "#...#", "#....", "#....", "#....", "#...#", ".###."},
+            {"#####", "#....", "#....", "####.", "#....", "#....", "#####"}, {"#....", "#....", "#....", "#....", "#....", "#....", "#####"},
+            {"#...#", "#...#", "#...#", "#...#", "#...#", ".#.#.", "..#.."}, {"#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."}};
+        auto glyph = [](char c) { return std::string("MARCELVT").find(c); };
+        int kx = std::max(1, (int)(cols * 0.9 / 35)), ky = std::max(1, (int)std::lround(kx * 0.67));
+        while (ky > 1 && 16 * ky > rows - 4) ky--;
+        int topRow = (rows - 16 * ky) / 2;
+        auto stamp = [&](const std::string& txt, int rowTop) {
+            int left = (cols - ((int)txt.size() * 6 - 1) * kx) / 2;
+            for (size_t gi = 0; gi < txt.size(); gi++) {
+                size_t g = glyph(txt[gi]);
+                for (int fr = 0; fr < 7; fr++)
+                    for (int fc = 0; fc < 5; fc++)
+                        if (G[g][fr][fc] == '#')
+                            for (int dy = 0; dy < ky; dy++)
+                                for (int dx = 0; dx < kx; dx++) {
+                                    int r = rowTop + fr * ky + dy, c = left + ((int)gi * 6 + fc) * kx + dx;
+                                    if (r >= 0 && r < rows && c >= 0 && c < cols) I.mask[(size_t)r * cols + c] = 1;
+                                }
+            }
+        };
+        stamp("MARCEL", topRow);
+        stamp("VRT", topRow + 9 * ky);
+        // soft glow around the lettering (two box-blur passes)
+        std::vector<float> a(n), b(n);
+        for (size_t i = 0; i < n; i++) a[i] = I.mask[i];
+        int rx = std::max(2, cols / 40), ry = std::max(1, rows / 24);
+        for (int pass = 0; pass < 2; pass++) {
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++) {
+                    float sum = 0; int cnt = 0;
+                    for (int d = -rx; d <= rx; d++) { int cc = c + d; if (cc >= 0 && cc < cols) { sum += a[(size_t)r * cols + cc]; cnt++; } }
+                    b[(size_t)r * cols + c] = sum / cnt;
+                }
+            for (int r = 0; r < rows; r++)
+                for (int c = 0; c < cols; c++) {
+                    float sum = 0; int cnt = 0;
+                    for (int d = -ry; d <= ry; d++) { int rr = r + d; if (rr >= 0 && rr < rows) { sum += b[(size_t)rr * cols + c]; cnt++; } }
+                    a[(size_t)r * cols + c] = sum / cnt;
+                }
+        }
+        for (size_t i = 0; i < n; i++) I.blur[i] = std::min(1.f, a[i] * 2.2f);
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+                I.rt[(size_t)r * cols + c] = (float)(0.55 * rnd(0, 1) + 0.45 * c / cols);  // forms roughly left to right
+    }
+
+    void drawIntro() {
+        introBuild();
+        Intro& I = intro;
+        double t = (clock() - introT0) / 1000.0;
+        if (t >= INTRO_END) { endIntro(); return; }
+        Color bgc = bg(), ik = ink();
+        double fade = t > 6.0 ? std::max(0.0, 1.0 - (t - 6.0) / 0.8) : 1.0;
+        static const double LV[6] = {0.0, 0.07, 0.14, 0.28, 0.55, 1.0};
+        double sweep = std::clamp((t - 2.0) / 1.2, 0.0, 1.0) * I.rows;   // letters take over from the top down
+        double rowsOn = std::min((double)I.rows, t / 1.4 * I.rows);       // junk text fills the screen first
+        const double R0 = 3.0, R1 = 5.4;                                   // when the lettering forms (seconds)
+        std::vector<unsigned char> lv(I.cols);
+        for (int r = 0; r < I.rows; r++) {
+            bool field = r < sweep;
+            if (!field && r >= rowsOn) continue;
+            for (int c = 0; c < I.cols; c++) {
+                size_t i = (size_t)r * I.cols + c;
+                char& chr = I.ch[i];
+                int L;
+                if (field) {
+                    if (chr < 'A' || chr > 'Z') chr = letterChar();
+                    double edge = std::min(1.0, std::min(c, I.cols - 1 - c) / (I.cols * 0.18));
+                    if (I.mask[i]) {
+                        double rv = R0 + I.rt[i] * (R1 - R0), pr = std::clamp((t - rv) / 0.5, 0.0, 1.0);
+                        L = (int)std::lround(1 + pr * 4.0);              // fades up to full brightness
+                        if (pr >= 1 && rng() % 100 < 18) L = 4;
+                        else if (pr >= 1 && rng() % 100 < 2) L = 3;
+                        if (rng() % 100 < (pr >= 1 ? 4u : 12u)) chr = letterChar();
+                    } else {
+                        double v = (0.04 + 0.10 * I.blur[i]) * edge;
+                        L = v < 0.05 ? 0 : (v < 0.09 ? 1 : 2);
+                        if (rng() % 1000 < 6u + (unsigned)(18 * I.blur[i])) L = std::min(3, L + 1);
+                        if (rng() % 100 < 7) chr = letterChar();
+                    }
+                } else {
+                    L = (rng() % 100 < 12) ? 4 : 3;
+                    if (rng() % 100 < 4) chr = junkChar();
+                }
+                lv[c] = (unsigned char)L;
+            }
+            int c = 0;
+            while (c < I.cols) {
+                int L = lv[c], e = c;
+                while (e < I.cols && lv[e] == L && e - c < 24) e++;
+                if (L > 0)
+                    cv->text(I.x0 + c * I.adv, r * I.cellH, std::string(I.ch.begin() + (size_t)r * I.cols + c, I.ch.begin() + (size_t)r * I.cols + e),
+                             I.pt, NW, mix(bgc, ik, LV[L] * fade), 0, 0);
+                c = e;
+            }
+        }
+        if (t > 0.5) {   // ragged solid glitch bars in the lower half
+            int b0 = (int)(I.rows * 0.36), groups = std::max(0, (I.rows - b0) / 2);
+            I.bar.resize(groups, 0.f);
+            Color bc = mix(bgc, ik, fade);
+            for (int gi = 0; gi < groups; gi++) {
+                int r0 = b0 + gi * 2;
+                if (r0 < sweep) continue;
+                if (rng() % 100 < 22) I.bar[gi] = (rng() % 100 < 12) ? 0.f : (float)rnd(0.08, 0.96);
+                double len = I.bar[gi] * std::min(1.0, (t - 0.5) / 0.8);
+                if (len > 0.01) cv->rect(I.x0, r0 * I.cellH, I.x0 + len * I.cols * I.adv, (r0 + 2) * I.cellH - 2, bc, &bc, 1);
+            }
+        }
+        if (t > 0.8)
+            Tx(W / 2.0, H - I.cellH * 1.5, "PRESS ANY KEY TO SKIP", std::max(9, fs - 3), Anchor::C, mix(bgc, ik, 0.45 * fade));
+    }
+
     // ---- input
     void click(int x, int y) {
+        if (screen == INTRO) { endIntro(); return; }
         mx = x; my = y;
         for (auto it = regions.rbegin(); it != regions.rend(); ++it)
             if (x >= it->x1 && x <= it->x2 && y >= it->y1 && y <= it->y2) { Fn cb = it->cb; cb(); return; }
         for (auto it = polys.rbegin(); it != polys.rend(); ++it)
             if (inside(x, y, it->pts)) { Fn cb = it->cb; cb(); return; }
+        if (screen == PLAY && g.game == BAL) { if (live()) balMiss(); return; }   // clicked empty space
         react();
     }
     static bool inside(double px, double py, const std::vector<Pt>& p) {
@@ -858,10 +1150,11 @@ struct Trainer {
         return ok;
     }
     static bool reserved(int k) {
-        return k == 0x0D || k == 0x1B || (k >= '1' && k <= '5') || k == 'R' || k == 'D' || k == 'N' || k == 'S' || k == 'A';
+        return k == 0x0D || k == 0x1B || (k >= '1' && k <= '7') || k == 'R' || k == 'D' || k == 'N' || k == 'S' || k == 'A' || k == 'I';
     }
     // k: Windows virtual-key code (letters/digits are their ASCII codes)
     void key(int k) {
+        if (screen == INTRO) { endIntro(); return; }
         if (rebind >= 0) {
             int* slots[4] = {&kRestart, &kTab, &kTheme, &kFull};
             if (k == 0x1B) { rebind = -1; keyMsg = "CANCELLED"; }
@@ -882,12 +1175,13 @@ struct Trainer {
         else if (k == kTab) { if (isTab()) setTab((tab + 1) % 5); }
         else if (k == kRestart) { if (screen == PLAY || screen == RESULT || screen == MENU) begin(); }
         else if (screen == MENU) {
-            if (k >= '1' && k <= '5') select(k - '1');
+            if (k >= '1' && k <= '7') select(k - '1');
             else if (k == 'R') setRounds(ROUNDS[(std::find(ROUNDS, ROUNDS + 3, rounds) - ROUNDS + 1) % 3]);
             else if (k == 'D') setDiff((diff + 1) % 3);
             else if (k == 'N') toggleN();
             else if (k == 'S') toggleT();
             else if (k == 'A') toggleAudio();
+            else if (k == 'I') startIntro();
             else if (k == 0x0D) begin();
         } else if (screen == PLAY && k == 0x0D) react();
         else if (screen == RESULT && k == 0x0D) begin();
@@ -902,10 +1196,10 @@ struct Trainer {
     }
     void persist() {
         Settings z;
-        z.theme = theme; z.game = sel; z.rounds = rounds; z.diff = diff; z.schSize = schSize;
+        z.theme = theme; z.game = sel; z.rounds = rounds; z.diff = diff; z.schSize = schSize; z.frenzy = frenzy;
         z.spinN = spinN; z.spinT = spinT; z.strAudio = strAudio;
         z.ih = ih; z.is = is; z.iv = iv; z.bh = bh; z.bs = bs; z.bv = bv;
-        z.kRestart = kRestart; z.kTab = kTab; z.kTheme = kTheme; z.kFull = kFull;
+        z.kRestart = kRestart; z.kTab = kTab; z.kTheme = kTheme; z.kFull = kFull; z.introSeen = introSeen;
         store.st = z;
         store.save();
     }
@@ -913,6 +1207,7 @@ struct Trainer {
     void setRounds(int r) { rounds = r; persist(); redraw(); }
     void setDiff(int i) { diff = i; persist(); redraw(); }
     void setSize(int n) { schSize = n; persist(); redraw(); }
+    void setFrenzy(int n) { frenzy = n; persist(); redraw(); }
     void toggleN() { spinN = !spinN; persist(); redraw(); }
     void toggleT() { spinT = !spinT; persist(); redraw(); }
     void toggleAudio() { strAudio = !strAudio; persist(); redraw(); }
@@ -932,7 +1227,9 @@ struct Trainer {
         persist(); cancel();
         g = G();
         g.game = sel; g.di = diff; g.rounds = rounds;
-        if (sel == SCH) { g.spinN = spinN; g.spinT = spinT; g.n = schSize; }
+        if (sel == SCH) { g.spinN = spinN; g.spinT = spinT; g.n = schSize; g.frenzy = frenzy; }
+        if (sel == DTP) g.rounds = rounds * 5;
+        if (sel == BAL) g.rounds = rounds * 2;
         screen = PLAY; flash = false; bad = -1; awaitPaint = false;
         msg = "GET READY...";
         redraw();
@@ -943,6 +1240,8 @@ struct Trainer {
             case VRT: case ART: vrtNext(); break;
             case SCH: schNew(); break;
             case STR: strNext(); break;
+            case DTP: dtpStart(); break;
+            case BAL: balStart(); break;
             default: tswNext();
         }
     }
@@ -951,7 +1250,7 @@ struct Trainer {
         auto& v = g.vals;
         if (!v.empty()) {
             std::string code = GAMES[g.game].code, dn = DIFFS[g.di], m;
-            if (g.game == SCH) m = F("%d", g.n);
+            if (g.game == SCH) m = F("%d", g.n) + (g.frenzy ? F("F%d", g.frenzy) : std::string());
             if (g.spinN) m += "N";
             if (g.spinT) m += "T";
             double sum = 0;

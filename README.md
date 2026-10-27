@@ -1,6 +1,10 @@
 # Reaction Trainer
 
-A small Windows reflex-training app with a retro terminal look. Five tests, three difficulties, ranks, rebindable keys, your own color themes, and every run is saved so you can watch yourself improve. One portable `.exe`, no installer, no dependencies.
+A small Windows reflex-training app with a retro terminal look. Seven tests, three difficulties, ranks, rebindable keys, your own color themes, and every run is saved so you can watch yourself improve. One portable `.exe`, no installer, no dependencies.
+
+## Intro
+
+The first time you launch the app it plays a short glitch-terminal intro that resolves into **MARCEL VRT**, drawn in your current theme colors. Any key or click skips it, and `I` on the TEST tab replays it.
 
 ## Tests
 
@@ -8,8 +12,10 @@ A small Windows reflex-training app with a retro terminal look. Five tests, thre
 |------|-------------|
 | **Visual Reaction** | Click the instant the screen flashes. Clicking too early counts as a miss. |
 | **Audio Reaction** | Click the instant you hear the beep. |
-| **Schulte Table** | Click 1 to N in order. Table sizes **3x3 to 6x6**. Optional **Spin Numbers** (tilted digits) and **Spin Table** (rotating grid, faster on higher difficulty). |
+| **Schulte Table** | Click 1 to N in order. Table sizes **3x3 to 6x6**. Optional **Spin Numbers** (tilted digits), **Spin Table** (rotating grid, faster on higher difficulty) and **Frenzy** (1 React or 2): the numbers are hidden and only the next 1 or 2 are revealed, so with Frenzy 1 you hit a number and the next one appears for you to react to. |
 | **Target Switch** | Click the lit dot; a new one lights up after every hit. A miss adds 500 ms. |
+| **Don't Tap** | Tap the black tile on the bottom row and the board moves up. Never tap a white tile. 25 / 50 / 100 tiles (rounds x5), 3 to 5 columns. A miss adds 500 ms. |
+| **Ball Sheet** | Big balls appear on the sheet, click each one fast. 10 / 20 / 40 balls (rounds x2), 1 to 3 balls at a time. Clicking empty space adds 500 ms. |
 | **Color Trial** | A color word is printed in another color. Press the button named after the color it is *printed* in (GREEN printed in red means press **Red**). A draining timer bar runs on every word (5 / 3.5 / 2.5 s), and the voice reads out the **written** word to throw you off (toggle with `A`). A miss adds 500 ms. |
 
 Rounds: **5 / 10 / 20**. Difficulty: **Easy / Medium / Hard**.
@@ -30,27 +36,28 @@ Iron, Bronze, Silver, Gold, Platinum, Diamond, Jade, Master, Grandmaster, Nova, 
 
 Each test has its own ladder, with **Visual Reaction as the reference** (average of a run, in ms):
 
-| Rank | Visual Reaction | Rank | Visual Reaction |
-|------|-----------------|------|-----------------|
-| Celestial | under 170 | Gold | under 305 |
-| Astra | under 185 | Silver | under 340 |
-| Nova | under 200 | Bronze | under 400 |
-| Grandmaster | under 215 | Iron | 400 and slower |
-| Master | under 230 | | |
-| Jade | under 245 | | |
-| Diamond | under 260 | | |
-| Platinum | under 280 | | |
+| Rank | Visual Reaction (ms) | Rank | Visual Reaction (ms) |
+|------|----------------------|------|----------------------|
+| Celestial | 100 and lower | Gold | up to 260 |
+| Astra | up to 125 | Silver | up to 300 |
+| Nova | up to 140 | Bronze | up to 360 |
+| Grandmaster | up to 155 | Iron | slower than 360 |
+| Master | up to 170 | | |
+| Jade | up to 185 | | |
+| Diamond | up to 205 | | |
+| Platinum | up to 230 | | |
 
-Your rank in a test comes from your best finished run. Harder difficulties count a little better (Medium x0.93, Hard x0.86), and Schulte is scored per number so different table sizes compare fairly. Your overall rank is the average across the tests you have played. The other ladders are in `RANKT` in `src/trainer.hpp`.
+Your rank in a test comes from your best finished run. Harder difficulties count a little better (Medium x0.93, Hard x0.86), and Schulte is scored per number so different table sizes compare fairly (Frenzy runs are saved but do not count towards rank). Your overall rank is the average across the tests you have played. The other ladders are in `RANKT` in `src/trainer.hpp`.
 
 ## Controls
 
 | Key | Action |
 |-----|--------|
-| `1`-`5` | Pick a test |
+| `1`-`7` | Pick a test |
 | `R` / `D` | Cycle rounds / difficulty |
 | `N` / `S` | Toggle Spin Numbers / Spin Table (Schulte) |
 | `A` | Toggle word audio (Color Trial) |
+| `I` | Replay the intro |
 | `Enter` | Start / react / play again |
 | click | React (reaction tests) and click targets |
 | `Space` | **Restart the current run** (rebindable) |
@@ -102,7 +109,7 @@ g++ -std=c++17 -O1 -Wall -Wextra tests/test_core.cpp -o core_tests && ./core_tes
 
 ## Publishing a release (GitHub)
 
-Easiest: double-click `publish.bat`, type a version like `v1.1.0` and a short description. It commits, pushes and tags for you.
+Easiest: double-click `publish.bat`, type a version like `v1.2.0` and a short description. It commits, pushes and tags for you.
 
 By hand:
 
@@ -110,8 +117,8 @@ By hand:
 git add .
 git commit -m "Describe your change"
 git push
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
 
 Pushing a `v*` tag makes GitHub Actions run the tests, build the exe on Windows, and attach `ReactionTrainer.exe` and `ReactionTrainer-windows-x64.zip` to a new Release automatically. Always use a new version number for each release.
@@ -127,7 +134,7 @@ tests/test_core.cpp headless logic tests
 
 ## Credits
 
-Created by AimerMarcel.
+Created by AimerMarcel. Built with the help of Claude (Anthropic).
 
 ## License
 

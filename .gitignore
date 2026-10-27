@@ -11,5 +11,3 @@ core_tests
 .vscode/
 CMakeCache.txt
 CMakeFiles/
-gitignore
-publish.bat

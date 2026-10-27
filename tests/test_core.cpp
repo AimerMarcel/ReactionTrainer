@@ -37,9 +37,23 @@ int main() {
     auto frame = [&] { T += 25; app.update(); app.draw(cv, 1100, 720); app.presented(); };
     auto center = [&](const Trainer::Region& r) { return std::pair<int, int>((int)((r.x1 + r.x2) / 2), (int)((r.y1 + r.y2) / 2)); };
 
+    // first launch plays the intro; it ends by itself and is remembered
+    CHECK(app.screen == Trainer::INTRO && !app.introSeen);
+    frame();
+    cv.items = 0; T = 4500; frame();                // mid-intro: lettering is forming
+    CHECK(cv.items > 300);
+    T = 8000; frame();                              // past the end
+    CHECK(app.screen == Trainer::MENU && app.introSeen);
+    { Store chk; chk.load(); CHECK(chk.st.introSeen); }
+    app.key('I'); CHECK(app.screen == Trainer::INTRO);   // replay, then any key skips
+    frame(); app.key('X'); CHECK(app.screen == Trainer::MENU);
+    app.key('I'); app.click(10, 10); CHECK(app.screen == Trainer::MENU);
+    for (int i = 0; i < 3; i++) { app.key('I'); T += 1000; frame(); app.key(0x0D); }   // skipping never starts a game
+    CHECK(app.screen == Trainer::MENU);
     frame();
     CHECK(cv.items > 20);
-    CHECK(app.screen == Trainer::MENU);
+    app.key('6'); CHECK(app.sel == DTP); app.key('7'); CHECK(app.sel == BAL); app.key('3'); CHECK(app.sel == SCH);   // number keys pick tests
+    frame();
 
     // play the current selection to the result screen, with one deliberate wrong click in some games
     auto session = [&](int game) {
@@ -55,6 +69,12 @@ int main() {
                 int pi = 0;
                 for (int j = 0; j < k; j++) if (g.nums[j] >= g.cur) pi++;
                 CHECK(pi < (int)app.polys.size());
+                if (g.frenzy) {                        // frenzy: only the next N numbers are revealed
+                    int vis = 0;
+                    for (int j = 0; j < g.n * g.n; j++) if (app.schVisible(j)) vis++;
+                    CHECK(vis == std::min(g.frenzy, g.n * g.n - g.cur + 1));
+                    CHECK(app.schVisible(k));          // the number to click is always one of them
+                }
                 double sx = 0, sy = 0;
                 for (auto& p : app.polys[pi].pts) { sx += p.x; sy += p.y; }
                 T += 300; app.click((int)(sx / 4), (int)(sy / 4));
@@ -63,6 +83,16 @@ int main() {
                 if (g.idx == 1) { auto c = center(app.regions[base + (g.lit + 1) % (g.r * g.c)]); app.click(c.first, c.second); frame(); }
                 auto c = center(app.regions[base + g.lit]);
                 T += 280; app.click(c.first, c.second);
+            } else if (game == DTP && g.phase == Trainer::RUN) {
+                int base = (int)app.regions.size() - g.n;
+                if (g.idx == 1) { auto c = center(app.regions[base + (g.tiles[0] + 1) % g.n]); app.click(c.first, c.second); frame(); }
+                auto c = center(app.regions[base + g.tiles[0]]);
+                T += 250; app.click(c.first, c.second);
+            } else if (game == BAL && g.phase == Trainer::RUN) {
+                if (g.idx == 1) { app.click(2, 2); frame(); }       // empty space = miss
+                int base = (int)app.regions.size() - (int)g.balls.size();
+                auto c = center(app.regions[base]);
+                T += 300; app.click(c.first, c.second);
             } else if (game == STR && g.phase == Trainer::RUN) {
                 CHECK(g.word != g.ink);
                 int base = (int)app.regions.size() - 9, slot = 0;
@@ -73,17 +103,19 @@ int main() {
             }
         }
         CHECK(app.screen == Trainer::RESULT);
-        CHECK(app.g.rec.done == 5 && (int)app.g.rec.vals.size() == 5);
+        CHECK(app.g.rec.done == app.g.rounds && (int)app.g.rec.vals.size() == app.g.rounds);
         frame();
     };
 
     int sessions = 0;
-    for (int game = 0; game < 5; game++)
+    for (int game = 0; game < NG; game++)
         for (int di = 0; di < 3; di++) {
             app.sel = game; app.diff = di; app.rounds = 5; app.schSize = 3 + di;
             app.spinN = app.spinT = (game == SCH && di >= 1);
             session(game);
-            if (game == TSW || game == STR) CHECK(app.g.rec.miss >= 1);
+            if (game == TSW || game == STR || game == DTP || game == BAL) CHECK(app.g.rec.miss >= 1);
+            if (game == DTP) CHECK(app.g.rounds == 25 && app.g.rec.vals.size() == 25);
+            if (game == BAL) CHECK(app.g.rounds == 10);
             if (game == ART) CHECK(beeps > 0);
             sessions++;
         }
@@ -95,8 +127,22 @@ int main() {
         CHECK(app.g.rec.mods == (spin ? "6NT" : "6"));
         sessions++;
     }
-    CHECK(sessions == 17);
-    CHECK(app.store.runs.size() == 17);
+    // Schulte frenzy 1 (react) and 2, with and without spin
+    for (int f = 1; f <= 2; f++) {
+        app.sel = SCH; app.diff = 0; app.rounds = 5; app.schSize = 4; app.frenzy = f; app.spinN = app.spinT = (f == 2);
+        session(SCH);
+        CHECK(app.g.rec.mods == F("4F%d", f) + (f == 2 ? "NT" : ""));
+        sessions++;
+    }
+    app.frenzy = 0;
+    CHECK(sessions == 7 * 3 + 2 + 2);
+    CHECK((int)app.store.runs.size() == sessions);
+    {   // frenzy runs are kept out of the rank scores
+        double mn = -1;
+        for (auto& r : app.store.runs)
+            if (r.game == "SCH" && r.mods.find('F') == std::string::npos) { double v = runScore(r); if (mn < 0 || v < mn) mn = v; }
+        CHECK(mn > 0 && std::fabs(mn - app.bestScore(SCH)) < 1e-9);
+    }
     CHECK(!spoken.empty());                       // color trial spoke the written word
     CHECK(spoken.size() >= 3 * 5);
 
@@ -126,12 +172,17 @@ int main() {
     CHECK(app.screen == Trainer::MENU);
 
     // ranks
-    CHECK(RANK_NAMES[rankFromScore(VRT, 160)] == std::string("CELESTIAL"));
-    CHECK(RANK_NAMES[rankFromScore(VRT, 199)] == std::string("NOVA"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 95)] == std::string("CELESTIAL"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 100)] == std::string("CELESTIAL"));    // 100 and lower
+    CHECK(RANK_NAMES[rankFromScore(VRT, 101)] == std::string("ASTRA"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 125)] == std::string("ASTRA"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 126)] == std::string("NOVA"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 140)] == std::string("NOVA"));
+    CHECK(RANK_NAMES[rankFromScore(VRT, 141)] == std::string("GRANDMASTER"));
     CHECK(RANK_NAMES[rankFromScore(VRT, 500)] == std::string("IRON"));
     int oi = -1; double of = 0;
     CHECK(app.overall(oi, of) && oi >= 0 && oi < 12);
-    for (int i = 0; i < 5; i++) CHECK(app.gameRank(i) >= 0);
+    for (int i = 0; i < NG; i++) CHECK(app.gameRank(i) >= 0);
     app.setTab(2); frame();
     CHECK(app.screen == Trainer::RANK);
 
@@ -177,10 +228,10 @@ int main() {
     app.setTab(1); frame();
 
     // persistence round trip of everything new
-    app.schSize = 6; app.strAudio = false; app.ih = 200; app.persist();
+    app.schSize = 6; app.strAudio = false; app.ih = 200; app.frenzy = 2; app.persist();
     Store s2; s2.load();
     CHECK(s2.runs.size() == app.store.runs.size());
-    CHECK(s2.st.schSize == 6 && !s2.st.strAudio && std::fabs(s2.st.ih - 200) < 0.1);
+    CHECK(s2.st.schSize == 6 && !s2.st.strAudio && std::fabs(s2.st.ih - 200) < 0.1 && s2.st.frenzy == 2);
     CHECK(s2.st.kRestart == 0x20 && s2.st.kTab == 0x09 && s2.st.theme == app.theme);
     CHECK(s2.runs.back().vals.size() == 5);
 
@@ -192,6 +243,6 @@ int main() {
     CHECK(app.screen == Trainer::MENU && app.store.runs.back().complete == false);
     app.setTab(1); app.clearData(); app.clearData();
     CHECK(app.store.runs.empty());
-    std::printf("core tests passed (%d full sessions)\n", sessions);
+    std::printf("core tests passed (%d full sessions, 7 tests)\n", sessions);
     return 0;
 }
