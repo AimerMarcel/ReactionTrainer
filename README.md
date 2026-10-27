@@ -134,7 +134,7 @@ tests/test_core.cpp headless logic tests
 
 ## Credits
 
-Created by AimerMarcel. Built with the help of Claude (Anthropic).
+Created by AimerMarcel. 
 
 ## License
 
